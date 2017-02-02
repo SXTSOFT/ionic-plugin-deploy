@@ -203,6 +203,29 @@ static NSOperationQueue *delegateQueue;
     });
 }
 
+- (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex{
+
+    if (buttonIndex ==0) {
+        NSString *baseUrl = self.deploy_server;
+        NSString *endpoint = [NSString stringWithFormat:@"/%@/manifest.plist", self.appId];
+        NSString *url = [NSString stringWithFormat:@"itms-services://?action=download-manifest&url=%@%@", baseUrl, endpoint];
+
+        [[UIApplication sharedApplication] openURL:[NSURL URLWithString:url]];
+    }
+    else if(buttonIndex ==1){
+        NSLog(@"不更新");
+    }
+}
+- (void) install:(CDVInvokedUrlCommand *)command {
+    self.appId = [command.arguments objectAtIndex:0];
+    NSString *baseUrl = self.deploy_server;
+    NSString *endpoint = [NSString stringWithFormat:@"/%@/manifest.plist", self.appId];
+    NSString *url = [NSString stringWithFormat:@"itms-services://?action=download-manifest&url=%@%@", baseUrl, endpoint];
+
+    [[UIApplication sharedApplication] openURL:[NSURL URLWithString:url]];
+    CDVPluginResult* pluginResult = nil;
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+}
 // private
 - (void) handleCheckResponse:(JsonHttpResponse)result callbackId:(NSString *)callbackId {
     CDVPluginResult* pluginResult = nil;
@@ -212,35 +235,53 @@ static NSOperationQueue *delegateQueue;
     if(result.json != nil) {
         NSLog(@"JSON: %@", result.json);
         NSDictionary *resp = [result.json objectForKey: @"data"];
-        NSNumber *compatible = [resp valueForKey:@"compatible"];
+        //NSNumber *compatible = [resp valueForKey:@"compatible"];
         NSNumber *update_available = [resp valueForKey:@"available"];
         NSString *ignore_version = [prefs objectForKey:@"ionicdeploy_version_ignore"];
+        NSString *appVersion = [resp objectForKey:@"version"];
 
-        NSLog(@"compatible: %@", (compatible) ? @"True" : @"False");
-        NSLog(@"available: %@", (update_available) ? @"True" : @"False");
+        //NSLog(@"compatible: %@", (compatible) ? @"True" : @"False");
+        //NSLog(@"available: %@", (update_available) ? @"True" : @"False");
 
-        if (compatible != [NSNumber numberWithBool:YES]) {
-            NSLog(@"Refusing update due to incompatible binary version");
-        } else if(update_available == [NSNumber numberWithBool: YES]) {
-            NSString *update_uuid = [resp objectForKey:@"snapshot"];
-            NSLog(@"update uuid: %@", update_uuid);
+//        if (compatible != [NSNumber numberWithBool:YES]) {
+//            dispatch_async(dispatch_get_main_queue(), ^{
+//                UIAlertView* alert = [[UIAlertView alloc] initWithTitle:@"更新提示" message:@"发现新版本" delegate:self cancelButtonTitle:@"更新" otherButtonTitles:@"暂不更新", nil];
+//
+//                [alert show];
+//            });
+//            NSLog(@"Refusing update due to incompatible binary version");
+//        } else if(update_available == [NSNumber numberWithBool: YES]) {
+//            NSString *update_uuid = [resp objectForKey:@"snapshot"];
+//            NSLog(@"update uuid: %@", update_uuid);
+//
+//            if(![update_uuid isEqual:ignore_version] && ![update_uuid isEqual:our_version]) {
+//                [prefs setObject: update_uuid forKey: @"upstream_uuid"];
+//                [prefs synchronize];
+//                self.last_update = resp;
+//            } else {
+//                update_available = 0;
+//            }
+//        }
+//
+//        if (update_available == [NSNumber numberWithBool:YES] && compatible == [NSNumber numberWithBool:YES]) {
+//            NSLog(@"update is true");
+//            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:@"true"];
+//        } else {
+//            NSLog(@"update is false");
+//            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:@"false"];
+//        }
+                    NSString *update_uuid = [resp objectForKey:@"snapshot"];
+                    NSLog(@"update uuid: %@", update_uuid);
 
-            if(![update_uuid isEqual:ignore_version] && ![update_uuid isEqual:our_version]) {
-                [prefs setObject: update_uuid forKey: @"upstream_uuid"];
-                [prefs synchronize];
-                self.last_update = resp;
-            } else {
-                update_available = 0;
-            }
-        }
-
-        if (update_available == [NSNumber numberWithBool:YES] && compatible == [NSNumber numberWithBool:YES]) {
-            NSLog(@"update is true");
-            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:@"true"];
-        } else {
-            NSLog(@"update is false");
-            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:@"false"];
-        }
+                    if(![update_uuid isEqual:ignore_version] && ![update_uuid isEqual:our_version]) {
+                        [prefs setObject: update_uuid forKey: @"upstream_uuid"];
+                        [prefs synchronize];
+                        self.last_update = resp;
+                    } else {
+                        update_available = 0;
+                    }
+        self.last_update = resp;
+        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:appVersion];
     } else {
         NSLog(@"unable to check for updates");
         pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:@"false"];
@@ -517,9 +558,11 @@ static NSOperationQueue *delegateQueue;
 
 - (struct JsonHttpResponse) postDeviceDetails {
     NSString *baseUrl = self.deploy_server;
-    NSString *endpoint = [NSString stringWithFormat:@"/deploy/channels/%@/check-device/", self.channel_tag];
+    //NSString *endpoint = [NSString stringWithFormat:@"/deploy/channels/%@/check-device/", self.channel_tag];
+    NSTimeInterval timeInSeconds = [[NSDate date] timeIntervalSince1970];
+    NSString *endpoint = [NSString stringWithFormat:@"/%@/ios/check.json?t=%f", self.appId,timeInSeconds];
     NSString *url = [NSString stringWithFormat:@"%@%@", baseUrl, endpoint];
-    NSDictionary* headers = @{@"Content-Type": @"application/json", @"accept": @"application/json"};
+    //NSDictionary* headers = @{@"Content-Type": @"application/json", @"accept": @"application/json"};
     NSString *uuid = [[NSUserDefaults standardUserDefaults] objectForKey:@"uuid"];
     NSString *app_version = [[self deconstructVersionLabel:self.version_label] firstObject];
 
@@ -533,17 +576,20 @@ static NSOperationQueue *delegateQueue;
         deviceDict[@"snapshot"] = uuid;
     }
 
-    NSDictionary *parameters = @{
-                                 @"device": deviceDict,
-                                 @"app_id": self.appId,
-                                 @"channel_tag": self.channel_tag
-                                 };
+//    NSDictionary *parameters = @{
+//                                 @"device": deviceDict,
+//                                 @"app_id": self.appId,
+//                                 @"channel_tag": self.channel_tag
+//                                 };
 
-    UNIHTTPJsonResponse *result = [[UNIRest postEntity:^(UNIBodyRequest *request) {
+    UNIHTTPJsonResponse *result = [[UNIRest get:^(UNISimpleRequest *request){
         [request setUrl:url];
-        [request setHeaders:headers];
-        [request setBody:[NSJSONSerialization dataWithJSONObject:parameters options:0 error:nil]];
     }] asJson];
+//    UNIHTTPJsonResponse *result = [[UNIRest postEntity:^(UNIBodyRequest *request) {
+//        [request setUrl:url];
+//        [request setHeaders:headers];
+//        [request setBody:[NSJSONSerialization dataWithJSONObject:parameters options:0 error:nil]];
+//    }] asJson];
 
     NSLog(@"version is: %@", app_version);
     NSLog(@"uuid is: %@", uuid);
