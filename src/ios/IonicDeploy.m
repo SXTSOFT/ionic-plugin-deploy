@@ -270,7 +270,7 @@ static NSOperationQueue *delegateQueue;
 //            NSLog(@"update is false");
 //            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:@"false"];
 //        }
-                    NSString *update_uuid = [resp objectForKey:@"snapshot"];
+                    NSString *update_uuid = [resp objectForKey:@"version"];
                     NSLog(@"update uuid: %@", update_uuid);
 
                     if(![update_uuid isEqual:ignore_version] && ![update_uuid isEqual:our_version]) {
