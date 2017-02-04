@@ -1,12 +1,20 @@
 package io.ionic.deploy;
 
+import android.Manifest;
+import android.app.Activity;
+import android.app.DownloadManager;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.IntentFilter;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.AssetManager;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Environment;
 import android.util.Log;
 
 import org.apache.cordova.CallbackContext;
@@ -34,6 +42,9 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
+import java.text.DateFormat;
+import java.util.Date;
+import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.net.URL;
 import java.net.URI;
@@ -45,6 +56,7 @@ import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
+import android.content.Intent;
 
 class JsonHttpResponse {
   String message;
@@ -173,6 +185,77 @@ public class IonicDeploy extends CordovaPlugin {
     }
     return null;
   }
+  private void checkDownloadPermissions() {
+    if (!cordova.hasPermission(Manifest.permission_group.LOCATION)) {
+      cordova.requestPermission(this, 10, Manifest.permission.WRITE_EXTERNAL_STORAGE);
+    }
+  }
+
+  @Override
+  public void onRequestPermissionResult(int requestCode, String[] permissions, int[] grantResults) throws JSONException {
+    if (permissions.length != 1 || grantResults.length != 1 || !Manifest.permission.WRITE_EXTERNAL_STORAGE.equals(permissions[0])) {
+      //throw new RuntimeException("Unexpected permission results " + Arrays.toString(permissions) + ", " + Arrays.toString(grantResults));
+    }
+    int result = grantResults[0];
+    String action = null;
+    switch (result) {
+      case PackageManager.PERMISSION_GRANTED:
+        String destination = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/";
+        String fileName = this.app_id+".app.apk";
+        destination += fileName;
+        final Uri uri = Uri.parse("file://" + destination);
+
+        //Delete update file if exists
+        File file = new File(destination);
+        if (file.exists())
+          //file.delete() - test this, I think sometimes it doesnt work
+          file.delete();
+
+        //get url of app on server
+        String url = this.server+"/"+this.app_id+"/android/app.apk";
+
+        //set downloadmanager
+        final Activity activity = this.cordova.getActivity();
+        DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+        try {
+          PackageManager packageManager = activity.getPackageManager();
+          ApplicationInfo info = packageManager.getApplicationInfo(this.cordova.getActivity().getPackageName(), 0);
+          request.setTitle(packageManager.getApplicationLabel(info).toString());
+          request.setDescription(this.cordova.getActivity().getPackageName());
+        }
+        catch (NameNotFoundException nnfe) {
+          Log.e("AppInfoPlugin", "Errpr occurred calling plugin: " + nnfe.getMessage());
+        }
+        //set destination
+        request.setDestinationUri(uri);
+
+        // get download service and enqueue file
+        final DownloadManager manager = (DownloadManager) activity.getSystemService(Context.DOWNLOAD_SERVICE);
+        final long downloadId = manager.enqueue(request);
+
+        //set BroadcastReceiver to install app when .apk is downloaded
+        final BroadcastReceiver onComplete = new BroadcastReceiver() {
+          public void onReceive(Context ctxt, Intent intent) {
+            Intent install = new Intent(Intent.ACTION_VIEW);
+            install.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            install.setDataAndType(uri,
+                    manager.getMimeTypeForDownloadedFile(downloadId));
+
+            activity.startActivity(install);
+            activity.unregisterReceiver(this);
+            activity.finish();
+          }
+        };
+
+        //activity.onRequestPermissionsResult();
+        //register receiver for when .apk download is compete
+        activity.registerReceiver(onComplete, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+        break;
+      default:
+        //throw new RuntimeException("Unexpected permission result int " + result);
+        break;
+    }
+  }
 
   /**
    * Executes the request and returns PluginResult.
@@ -211,6 +294,50 @@ public class IonicDeploy extends CordovaPlugin {
         }
       });
       return true;
+    } else if(action.equals("install")){
+
+      this.checkDownloadPermissions();
+//      File DbFile=new File("mnt/sdcard/HelloAndroid.apk");
+//      if(!(DbFile.exists()))
+//      {
+//        try
+//        {
+//          int length = 0;
+//          DbFile.createNewFile();
+//          String apk = "www.zip";
+//          String wwwFile = this.myContext.getFileStreamPath(apk).getAbsolutePath().toString();
+//          if (this.myContext.getFileStreamPath(apk).exists()) {
+//            InputStream inputStream = this.cordova.getActivity().getAssets().open(wwwFile);
+//            FileOutputStream fOutputStream = new FileOutputStream(DbFile);
+//            byte[] buffer = new byte[inputStream.available()];
+//            while ((length = inputStream.read(buffer)) > 0) {
+//              fOutputStream.write(buffer, 0, length);
+//            }
+//            fOutputStream.flush();
+//            fOutputStream.close();
+//            inputStream.close();
+//            String deleteCmd = "rm -r " + wwwFile;
+//            Runtime runtime = Runtime.getRuntime();
+//            try {
+//              runtime.exec(deleteCmd);
+//              logMessage("REMOVE", "Removed www.zip");
+//            } catch (IOException ioe) {
+//              logMessage("REMOVE", "Failed to remove " + wwwFile + ". Error: " + ioe.getMessage());
+//            }
+//          }
+//        }
+//        catch (Exception ex)
+//        {
+//          System.out.println("Error in creating new database at mobile..." + ex);
+//          ex.printStackTrace();
+//        }
+//      }
+//
+//      Intent intent = new Intent(Intent.ACTION_VIEW);
+//      intent.setDataAndType(Uri.fromFile(new File("/mnt/sdcard/HelloAndroid.apk")), "application/vnd.android.package-archive");
+//      intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+//      this.cordova.getActivity().startActivity(intent);
+      return  true;
     } else if (action.equals("extract")) {
       logMessage("EXTRACT", "Extracting update");
       final String uuid = this.getUUID("");
@@ -367,31 +494,41 @@ public class IonicDeploy extends CordovaPlugin {
     try {
       if (response.json != null) {
         JSONObject update = response.json.getJSONObject("data");
-        Boolean compatible = Boolean.valueOf(update.getString("compatible"));
-        Boolean updatesAvailable = Boolean.valueOf(update.getString("available"));
+        //Boolean compatible = Boolean.valueOf(update.getString("compatible"));
+        //Boolean updatesAvailable = Boolean.valueOf(update.getString("available"));
 
-        if(!compatible) {
-          logMessage("PARSEUPDATE", "Refusing update due to incompatible binary version");
-        } else if(updatesAvailable) {
-          try {
-            String update_uuid = update.getString("snapshot");
-            if(!update_uuid.equals(ignore_version) && !update_uuid.equals(loaded_version)) {
-              prefs.edit().putString("upstream_uuid", update_uuid).apply();
-              this.last_update = update;
-            } else {
-              updatesAvailable = new Boolean(false);
-            }
-
-          } catch (JSONException e) {
-            callbackContext.error("Update information is not available");
+        try {
+          String update_uuid = update.getString("version");
+          if(!update_uuid.equals(ignore_version) && !update_uuid.equals(loaded_version)) {
+            prefs.edit().putString("upstream_uuid", update_uuid).apply();
+            this.last_update = update;
           }
+          callbackContext.success(update_uuid);
+        } catch (JSONException e) {
+          callbackContext.error("Update information is not available");
         }
-
-        if(updatesAvailable && compatible) {
-          callbackContext.success("true");
-        } else {
-          callbackContext.success("false");
-        }
+//        if(!compatible) {
+//          logMessage("PARSEUPDATE", "Refusing update due to incompatible binary version");
+//        } else if(updatesAvailable) {
+//          try {
+//            String update_uuid = update.getString("snapshot");
+//            if(!update_uuid.equals(ignore_version) && !update_uuid.equals(loaded_version)) {
+//              prefs.edit().putString("upstream_uuid", update_uuid).apply();
+//              this.last_update = update;
+//            } else {
+//              updatesAvailable = new Boolean(false);
+//            }
+//
+//          } catch (JSONException e) {
+//            callbackContext.error("Update information is not available");
+//          }
+//        }
+//
+//        if(updatesAvailable && compatible) {
+//          callbackContext.success("true");
+//        } else {
+//          callbackContext.success("false");
+//        }
       } else {
         logMessage("PARSEUPDATE", "Unable to check for updates.");
         callbackContext.success("false");
@@ -403,6 +540,7 @@ public class IonicDeploy extends CordovaPlugin {
   }
 
   private void downloadUpdate(CallbackContext callbackContext) {
+    if(this.last_update == null) return;
     String upstream_uuid = this.prefs.getString("upstream_uuid", "");
     if (upstream_uuid != "" && this.hasVersion(upstream_uuid)) {
       // Set the current version to the upstream uuid
@@ -558,7 +696,9 @@ public class IonicDeploy extends CordovaPlugin {
   }
 
   private JsonHttpResponse postDeviceDetails(String uuid, final String channel_tag) {
-    String endpoint = "/deploy/channels/" + channel_tag + "/check-device";
+    DateFormat df = DateFormat.getDateInstance();
+    df.setTimeZone(TimeZone.getTimeZone("gmt"));
+    String endpoint = "/"+this.app_id+"/android/check.json?t="+ df.format(new Date());
     JsonHttpResponse response = new JsonHttpResponse();
     JSONObject json = new JSONObject();
     JSONObject device_details = new JSONObject();
@@ -573,23 +713,24 @@ public class IonicDeploy extends CordovaPlugin {
       json.put("app_id", this.app_id);
       json.put("device", device_details);
 
-      String params = json.toString();
-      byte[] postData = params.getBytes("UTF-8");
-      int postDataLength = postData.length;
+      //String params = json.toString();
+      //byte[] postData = params.getBytes("UTF-8");
+      //int postDataLength = postData.length;
 
       URL url = new URL(this.server + endpoint);
       HttpURLConnection.setFollowRedirects(true);
       HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 
-      conn.setDoOutput(true);
-      conn.setRequestMethod("POST");
-      conn.setRequestProperty("Content-Type", "application/json");
+      //conn.setDoOutput(true);
+      conn.setRequestMethod("GET");
+      //conn.setRequestProperty("Content-Type", "application/json");
       conn.setRequestProperty("Accept", "application/json");
       conn.setRequestProperty("Charset", "utf-8");
-      conn.setRequestProperty("Content-Length", Integer.toString(postDataLength));
+      int responseCode = conn.getResponseCode();
+      //conn.setRequestProperty("Content-Length", Integer.toString(postDataLength));
 
-      DataOutputStream wr = new DataOutputStream(conn.getOutputStream());
-      wr.write( postData );
+      //DataOutputStream wr = new DataOutputStream(conn.getOutputStream());
+      //wr.write( postData );
 
       InputStream in = new BufferedInputStream(conn.getInputStream());
       String result = readStream(in);
@@ -685,20 +826,30 @@ public class IonicDeploy extends CordovaPlugin {
 
       while ((zipEntry = zipInputStream.getNextEntry()) != null) {
         File newFile = new File(versionDir + "/" + zipEntry.getName());
-        newFile.getParentFile().mkdirs();
-
-        byte[] buffer = new byte[2048];
-
-        FileOutputStream fileOutputStream = new FileOutputStream(newFile);
-        BufferedOutputStream outputBuffer = new BufferedOutputStream(fileOutputStream, buffer.length);
-        int bits;
-        while((bits = zipInputStream.read(buffer, 0, buffer.length)) != -1) {
-          outputBuffer.write(buffer, 0, bits);
+        if(zipEntry.isDirectory()){
+          newFile.mkdirs();
         }
+        else {
+          if (newFile.canWrite()) {
+            if(newFile.exists())
+              newFile.delete();
+          } else {
+            logMessage("Not permission", versionDir + "/" + zipEntry.getName());
+          }
+          newFile.getParentFile().mkdirs();
+          byte[] buffer = new byte[2048];
 
+          FileOutputStream fileOutputStream = new FileOutputStream(newFile);
+          BufferedOutputStream outputBuffer = new BufferedOutputStream(fileOutputStream, buffer.length);
+          int bits;
+          while ((bits = zipInputStream.read(buffer, 0, buffer.length)) != -1) {
+            outputBuffer.write(buffer, 0, bits);
+          }
+          outputBuffer.flush();
+          outputBuffer.close();
+        }
         zipInputStream.closeEntry();
-        outputBuffer.flush();
-        outputBuffer.close();
+
 
         extracted += 1;
 
@@ -773,7 +924,7 @@ public class IonicDeploy extends CordovaPlugin {
         final String indexLocation = newIndexFile.toURI().toString();
         String newIndex = this.updateIndexCordovaReference(getStringFromFile(indexLocation));
 
-        // Create the file and directory, if need be 
+        // Create the file and directory, if need be
         versionDir.mkdirs();
         newIndexFile.createNewFile();
 
@@ -799,7 +950,7 @@ public class IonicDeploy extends CordovaPlugin {
   }
 
   /**
-   * Takes an index.html file parsed as a string and updates any extant references to cordova.js contained within to be 
+   * Takes an index.html file parsed as a string and updates any extant references to cordova.js contained within to be
    * valid for deploy.
    *
    * @param indexStr the string contents of index.html
