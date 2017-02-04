@@ -17,6 +17,15 @@ var IonicDeploy = {
       [app_id, channel_tag]
     );
   },
+  install:function(app_id,success, failure){
+    cordova.exec(
+      success,
+      failure,
+      'IonicDeploy',
+      'install',
+      [app_id]
+    );
+  },
   download: function(app_id, success, failure) {
   	cordova.exec(
   		success,
