@@ -631,8 +631,8 @@ public class IonicDeploy extends CordovaPlugin {
     int version_count = prefs.getInt("version_count", 0);
     Set<String> versions = this.getMyVersions();
 
-    if (version_count > 3) {
-      int threshold = version_count - 3;
+    if (version_count > 0) {
+      int threshold = version_count - 0;
 
       for (Iterator<String> i = versions.iterator(); i.hasNext();) {
         String version = i.next();

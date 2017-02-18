@@ -724,8 +724,8 @@ static NSOperationQueue *delegateQueue;
 
     int versionCount = (int) [[NSUserDefaults standardUserDefaults] integerForKey:@"version_count"];
 
-    if (versionCount && versionCount > 3) {
-        NSInteger threshold = versionCount - 3;
+    if (versionCount && versionCount > 0) {
+        NSInteger threshold = versionCount - 0;
 
         NSInteger count = [versions count];
         for (NSInteger index = (count - 1); index >= 0; index--) {
