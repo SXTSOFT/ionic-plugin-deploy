@@ -295,7 +295,7 @@ public class IonicDeploy extends CordovaPlugin {
       });
       return true;
     } else if(action.equals("install")){
-
+      this.prefs.edit().remove("uuid").apply();
       this.checkDownloadPermissions();
 //      File DbFile=new File("mnt/sdcard/HelloAndroid.apk");
 //      if(!(DbFile.exists()))

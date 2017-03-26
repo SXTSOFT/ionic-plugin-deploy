@@ -218,6 +218,8 @@ static NSOperationQueue *delegateQueue;
 }
 - (void) install:(CDVInvokedUrlCommand *)command {
     self.appId = [command.arguments objectAtIndex:0];
+    NSUserDefaults *prefs = [NSUserDefaults standardUserDefaults];
+    [prefs setObject: @"" forKey: @"uuid"];
     NSString *baseUrl = self.deploy_server;
     NSString *endpoint = [NSString stringWithFormat:@"/%@/manifest.plist", self.appId];
     NSString *url = [NSString stringWithFormat:@"itms-services://?action=download-manifest&url=%@%@", baseUrl, endpoint];
