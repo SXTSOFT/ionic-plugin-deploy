@@ -238,6 +238,8 @@ static NSOperationQueue *delegateQueue;
 }
 - (void) install:(CDVInvokedUrlCommand *)command {
     self.appId = [command.arguments objectAtIndex:0];
+    NSUserDefaults *prefs = [NSUserDefaults standardUserDefaults];
+    [prefs setObject: @"" forKey: @"uuid"];
     NSString *baseUrl = self.deploy_server;
     NSString *endpoint = [NSString stringWithFormat:@"/%@/manifest.plist", self.appId];
     NSString *url = [NSString stringWithFormat:@"itms-services://?action=download-manifest&url=%@%@", baseUrl, endpoint];
@@ -744,8 +746,8 @@ static NSOperationQueue *delegateQueue;
 
     int versionCount = (int) [[NSUserDefaults standardUserDefaults] integerForKey:@"version_count"];
 
-    if (versionCount && versionCount > 3) {
-        NSInteger threshold = versionCount - 3;
+    if (versionCount && versionCount > 0) {
+        NSInteger threshold = versionCount - 0;
 
         NSInteger count = [versions count];
         for (NSInteger index = (count - 1); index >= 0; index--) {
