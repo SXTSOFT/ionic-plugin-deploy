@@ -41,6 +41,16 @@ static NSOperationQueue *delegateQueue;
 
 @implementation IonicDeploy
 
+- (NSInteger) converToViersion:(NSString*) version{
+    NSArray * vs = [version componentsSeparatedByString:@"."];
+    if([vs count]>1){
+        NSInteger v = [[vs objectAtIndex:0] integerValue] * 100;
+        v += [[vs objectAtIndex:1] integerValue];
+        return v;
+    }
+    return 0;
+}
+
 - (void) pluginInitialize {
     NSUserDefaults *prefs = [NSUserDefaults standardUserDefaults];
     self.cordova_js_resource = [[NSBundle mainBundle] pathForResource:@"www/cordova" ofType:@"js"];
@@ -58,31 +68,41 @@ static NSOperationQueue *delegateQueue;
 
     if (![uuid isEqualToString:@""] && !self.ignore_deploy && ![uuid isEqualToString:ignore]) {
         if ( uuid != nil && ![self.currentUUID isEqualToString: uuid] ) {
-            // Get target index.html
-            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES);
-            NSString *libraryDirectory = [paths objectAtIndex:0];
-            NSString *path = [NSString stringWithFormat:@"%@/%@/index.html", libraryDirectory, uuid];
+            NSDictionary *infoDic = [[NSBundle mainBundle] infoDictionary];
+            NSString *appVersion = [infoDic objectForKey:@"CFBundleShortVersionString"];
+            NSInteger appV = [self converToViersion:appVersion];
+            NSInteger codeV = [self converToViersion:uuid];
+            
+            if(appV>codeV){
+                [self removeVersion:uuid];
+            }
+            else{
+                // Get target index.html
+                NSArray *paths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES);
+                NSString *libraryDirectory = [paths objectAtIndex:0];
+                NSString *path = [NSString stringWithFormat:@"%@/%@/index.html", libraryDirectory, uuid];
 
-            SEL wkWebViewSelector = NSSelectorFromString(@"loadFileURL:allowingReadAccessToURL:");
-            if ([self.webView respondsToSelector:wkWebViewSelector]) {
-                // It's a WKWebview
-                [((WKWebView*)self.webView)
-                 evaluateJavaScript:@"window.location.href"
-                 completionHandler:^(NSString *result, NSError *error) {
-                     NSArray *indexSplit = [result componentsSeparatedByString:@"?"];
-                     NSString *currentIndex = [indexSplit objectAtIndex:0];
-                     if (![currentIndex isEqualToString:path]) {
-                         [self doRedirect];
-                     }
-                 }];
+                SEL wkWebViewSelector = NSSelectorFromString(@"loadFileURL:allowingReadAccessToURL:");
+                if ([self.webView respondsToSelector:wkWebViewSelector]) {
+                    // It's a WKWebview
+                    [((WKWebView*)self.webView)
+                    evaluateJavaScript:@"window.location.href"
+                    completionHandler:^(NSString *result, NSError *error) {
+                        NSArray *indexSplit = [result componentsSeparatedByString:@"?"];
+                        NSString *currentIndex = [indexSplit objectAtIndex:0];
+                        if (![currentIndex isEqualToString:path]) {
+                            [self doRedirect];
+                        }
+                    }];
 
-            } else {
-                // It's a UIWebView
-                NSString *currentIndex = [((UIWebView*)self.webView) stringByEvaluatingJavaScriptFromString:@"window.location.href"];
-                NSArray *indexSplit = [currentIndex componentsSeparatedByString:@"?"];
-                currentIndex = [indexSplit objectAtIndex:0];
-                if (![currentIndex isEqualToString:path]) {
-                    [self doRedirect];
+                } else {
+                    // It's a UIWebView
+                    NSString *currentIndex = [((UIWebView*)self.webView) stringByEvaluatingJavaScriptFromString:@"window.location.href"];
+                    NSArray *indexSplit = [currentIndex componentsSeparatedByString:@"?"];
+                    currentIndex = [indexSplit objectAtIndex:0];
+                    if (![currentIndex isEqualToString:path]) {
+                        [self doRedirect];
+                    }
                 }
             }
         }

@@ -167,11 +167,34 @@ public class IonicDeploy extends CordovaPlugin {
       final String uuid = this.getUUID();
 
       if(!IonicDeploy.NO_DEPLOY_AVAILABLE.equals(uuid)) {
+        String appVersion = this.getVersion();
+        Integer appV = this.converToViersion(appVersion);
+        Integer uuV = this.converToViersion(uuid);
+        if(appV> uuV){
+          this.removeVersion(uuid);
+          return null;
+        }
         logMessage("LOAD", "Init Deploy Version");
         this.redirect(uuid);
       }
     }
     return null;
+  }
+  private int converToViersion(String version){
+    String[] vs = version.split("\\.");
+    if(vs.length <2 ) return 0;
+    return Integer.parseInt(vs[0])*100+Integer.parseInt(vs[1]);
+  }
+  public String getVersion() {
+    try {
+      PackageManager manager = this.myContext.getPackageManager();
+      PackageInfo info = manager.getPackageInfo(this.myContext.getPackageName(), 0);
+      String version = info.versionName;
+      return version;
+    } catch (Exception e) {
+      e.printStackTrace();
+      return "";
+    }
   }
 
   /**
