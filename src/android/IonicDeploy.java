@@ -206,6 +206,8 @@ public class IonicDeploy extends CordovaPlugin {
     } catch (Exception e) {
       e.printStackTrace();
       return "";
+    }
+  }
   private void checkDownloadPermissions() {
     if (!cordova.hasPermission(Manifest.permission_group.LOCATION)) {
       cordova.requestPermission(this, 10, Manifest.permission.WRITE_EXTERNAL_STORAGE);
