@@ -192,7 +192,6 @@ public class IonicDeploy extends CordovaPlugin {
     }
     return null;
   }
-<<<<<<< HEAD
   private int converToViersion(String version){
     String[] vs = version.split("\\.");
     if(vs.length <2 ) return 0;
@@ -207,7 +206,6 @@ public class IonicDeploy extends CordovaPlugin {
     } catch (Exception e) {
       e.printStackTrace();
       return "";
-=======
   private void checkDownloadPermissions() {
     if (!cordova.hasPermission(Manifest.permission_group.LOCATION)) {
       cordova.requestPermission(this, 10, Manifest.permission.WRITE_EXTERNAL_STORAGE);
@@ -277,7 +275,6 @@ public class IonicDeploy extends CordovaPlugin {
       default:
         //throw new RuntimeException("Unexpected permission result int " + result);
         break;
->>>>>>> 0aa5fac7b3ed99376395ddc7b5fac5fccc74c366
     }
   }
 
