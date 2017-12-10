@@ -484,7 +484,10 @@ static NSOperationQueue *delegateQueue;
                 NSString *query = [NSString stringWithFormat:@"cordova_js_bootstrap_resource=%@", self.cordova_js_resource];
 
                 NSURLComponents *components = [NSURLComponents new];
-                components.scheme = @"file";
+                //components.scheme = @"file";
+                components.scheme = @"http";
+                components.host = @"localhost";
+                components.port = [NSNumber numberWithInt:8080];
                 components.path = [NSString stringWithFormat:@"%@/%@/index.html", libraryDirectory, uuid];
                 components.query = query;
 
@@ -561,9 +564,10 @@ static NSOperationQueue *delegateQueue;
                     dispatch_async(dispatch_get_main_queue(), ^(void){
                         NSURL *readAccessUrl = [components.URL URLByDeletingLastPathComponent];
                         NSLog(@"Reloading the WKWebView.");
-                        SEL wkWebViewReloadSelector = NSSelectorFromString(@"reload");
-                        ((id (*)(id, SEL))objc_msgSend)(self.webView, wkWebViewReloadSelector);
-                        ((id (*)(id, SEL, id, id))objc_msgSend)(self.webView, wkWebViewSelector, components.URL, readAccessUrl);
+                        //SEL wkWebViewReloadSelector = NSSelectorFromString(@"reload");
+                        //((id (*)(id, SEL))objc_msgSend)(self.webView, wkWebViewReloadSelector);
+                        //((id (*)(id, SEL, id, id))objc_msgSend)(self.webView, wkWebViewSelector, components.URL, readAccessUrl);
+                        [((WKWebView*)self.webView) loadRequest: [NSURLRequest requestWithURL:components.URL] ];
                     });
                 }
                 else {
