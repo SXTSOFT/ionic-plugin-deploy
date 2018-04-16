@@ -482,12 +482,11 @@ static NSOperationQueue *delegateQueue;
                 NSArray *paths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES);
                 NSString *libraryDirectory = [paths objectAtIndex:0];
                 NSString *query = [NSString stringWithFormat:@"cordova_js_bootstrap_resource=%@", self.cordova_js_resource];
-
+                NSNumber *port = [NSNumber numberWithInt:(8080)];;
                 NSURLComponents *components = [NSURLComponents new];
-                //components.scheme = @"file";
                 components.scheme = @"http";
                 components.host = @"localhost";
-                components.port = [NSNumber numberWithInt:8080];
+                components.port = port;
                 components.path = [NSString stringWithFormat:@"%@/%@/index.html", libraryDirectory, uuid];
                 components.query = query;
 
@@ -556,18 +555,20 @@ static NSOperationQueue *delegateQueue;
                 // Write new index.html
                 [htmlData writeToFile:components.path atomically:YES encoding:NSUTF8StringEncoding error:nil];
 
+
                 // Do redirect
                 NSLog(@"Redirecting to: %@", components.URL.absoluteString);
-                SEL wkWebViewSelector = NSSelectorFromString(@"loadFileURL:allowingReadAccessToURL:");
+                //SEL wkWebViewSelector = NSSelectorFromString(@"loadFileURL:allowingReadAccessToURL:");
+                SEL wkWebViewSelector = NSSelectorFromString(@"loadHTMLString:baseURL:");
 
                 if ([self.webView respondsToSelector:wkWebViewSelector]) {
                     dispatch_async(dispatch_get_main_queue(), ^(void){
                         NSURL *readAccessUrl = [components.URL URLByDeletingLastPathComponent];
                         NSLog(@"Reloading the WKWebView.");
-                        //SEL wkWebViewReloadSelector = NSSelectorFromString(@"reload");
-                        //((id (*)(id, SEL))objc_msgSend)(self.webView, wkWebViewReloadSelector);
+                        SEL wkWebViewReloadSelector = NSSelectorFromString(@"reload");
+                        ((id (*)(id, SEL))objc_msgSend)(self.webView, wkWebViewReloadSelector);
                         //((id (*)(id, SEL, id, id))objc_msgSend)(self.webView, wkWebViewSelector, components.URL, readAccessUrl);
-                        [((WKWebView*)self.webView) loadRequest: [NSURLRequest requestWithURL:components.URL] ];
+                        ((id (*)(id, SEL, id, id))objc_msgSend)(self.webView, wkWebViewSelector, htmlData, readAccessUrl);
                     });
                 }
                 else {
