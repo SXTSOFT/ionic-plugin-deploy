@@ -6,6 +6,7 @@
 #import <objc/message.h>
 #import <UIKit/UIKit.h>
 #import <WebKit/WebKit.h>
+#import "CDVFile.h"
 
 typedef struct JsonHttpResponse {
     __unsafe_unretained NSString *message;
@@ -382,6 +383,72 @@ static NSOperationQueue *delegateQueue;
             NSLog(@"Unzipped...");
             NSLog(@"Removing www.zip %d", success);
         }
+    });
+}
+
+- (NSString *)pathForURL:(NSString *)urlString
+{
+    // Attempt to use the File plugin to resolve the destination argument to a
+    // file path.
+    NSString *path = nil;
+    id filePlugin = [self.commandDelegate getCommandInstance:@"File"];
+    if (filePlugin != nil) {
+        CDVFilesystemURL* url = [CDVFilesystemURL fileSystemURLWithString:urlString];
+        path = [filePlugin filesystemPathForURL:url];
+    }
+    // If that didn't work for any reason, assume file: URL.
+    if (path == nil) {
+        if ([urlString hasPrefix:@"file:"]) {
+            path = [[NSURL URLWithString:urlString] path];
+        }
+    }
+    return path;
+}
+
+- (void) unzip:(CDVInvokedUrlCommand *)command {
+
+
+    dispatch_async(self.serialQueue, ^{
+        @try {
+            self.callbackId = command.callbackId;
+            NSString *zipURL = [command.arguments objectAtIndex:0];
+            NSString *destinationURL = [command.arguments objectAtIndex:1];
+
+            NSString *zipPath = [self pathForURL:zipURL];
+            NSString *destinationPath = [self pathForURL:destinationURL];
+            [SSZipArchive unzipFileAtPath:zipPath toDestination:destinationPath delegate:self];
+
+        } @catch(NSException* exception) {
+            [self.commandDelegate sendPluginResult:[CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"unzip error"] callbackId:self.callbackId];
+        }
+
+        // self.callbackId = command.callbackId;
+        // self.ignore_deploy = false;
+
+        // NSString *upstream_uuid = [[NSUserDefaults standardUserDefaults] objectForKey:@"upstream_uuid"];
+
+        // if(upstream_uuid != nil && [self hasVersion:upstream_uuid]) {
+        //     [self updateVersionLabel:NOTHING_TO_IGNORE];
+        //     [self.commandDelegate sendPluginResult:[CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:@"done"] callbackId:self.callbackId];
+        // } else {
+        //     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES);
+        //     NSString *libraryDirectory = [paths objectAtIndex:0];
+        //     NSString *uuid = [[NSUserDefaults standardUserDefaults] objectForKey:@"uuid"];
+        //     NSString *filePath = [NSString stringWithFormat:@"%@/%@", libraryDirectory, @"www.zip"];
+        //     NSString *extractPath = [NSString stringWithFormat:@"%@/%@/", libraryDirectory, uuid];
+
+        //     NSLog(@"Path for zip file: %@", filePath);
+        //     NSLog(@"Unzipping...");
+
+        //     [SSZipArchive unzipFileAtPath:filePath toDestination:extractPath delegate:self];
+        //     [self saveVersion:upstream_uuid];
+        //     [self excludeVersionFromBackup:uuid];
+        //     [self updateVersionLabel:NOTHING_TO_IGNORE];
+        //     BOOL success = [[NSFileManager defaultManager] removeItemAtPath:filePath error:nil];
+
+        //     NSLog(@"Unzipped...");
+        //     NSLog(@"Removing www.zip %d", success);
+        // }
     });
 }
 

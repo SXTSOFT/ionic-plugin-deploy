@@ -28,6 +28,8 @@
 
 - (void) extract:(CDVInvokedUrlCommand *)command;
 
+- (void) unzip:(CDVInvokedUrlCommand *)command;
+
 - (void) redirect:(CDVInvokedUrlCommand *)command;
 
 - (void) info:(CDVInvokedUrlCommand *)command;

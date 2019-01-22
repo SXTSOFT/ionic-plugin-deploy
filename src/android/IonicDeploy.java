@@ -20,8 +20,10 @@ import android.util.Log;
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaInterface;
 import org.apache.cordova.CordovaPlugin;
+import org.apache.cordova.CordovaResourceApi;
 import org.apache.cordova.CordovaWebView;
 import org.apache.cordova.PluginResult;
+import org.apache.cordova.CordovaResourceApi.OpenForReadResult;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -57,6 +59,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 import android.content.Intent;
+
 
 class JsonHttpResponse {
   String message;
@@ -367,6 +370,17 @@ public class IonicDeploy extends CordovaPlugin {
       cordova.getThreadPool().execute(new Runnable() {
         public void run() {
           unzip("www.zip", uuid, callbackContext);
+        }
+      });
+      return true;
+    }
+     else if (action.equals("unzip")) {
+      logMessage("unzip", "unzip file");
+      final String source = args.getString(0);
+      final String desc = args.getString(1);
+      cordova.getThreadPool().execute(new Runnable() {
+        public void run() {
+          unzip2(source, desc, callbackContext);
         }
       });
       return true;
@@ -925,6 +939,106 @@ public class IonicDeploy extends CordovaPlugin {
     // if we get here we know unzip worked
     this.ignore_deploy = false;
     this.updateVersionLabel(IonicDeploy.NOTHING_TO_IGNORE);
+
+    callbackContext.success("done");
+  }
+
+  private Uri getUriForArg(String arg) {
+      CordovaResourceApi resourceApi = webView.getResourceApi();
+      Uri tmpTarget = Uri.parse(arg);
+      return resourceApi.remapUri(
+              tmpTarget.getScheme() != null ? tmpTarget : Uri.fromFile(new File(arg)));
+  }
+
+  private void unzip2(String zip, String dir, CallbackContext callbackContext) {
+    
+
+    logMessage("UNZIP", zip);
+
+    try  {
+      Uri zipUri = getUriForArg(zip);
+      Uri outputUri = getUriForArg(dir);
+
+      String outputDirectory = null;
+      CordovaResourceApi resourceApi = webView.getResourceApi();
+      OpenForReadResult zipFile2 = resourceApi.openForRead(zipUri);
+      File zipF = resourceApi.mapUriToFile(zipUri);
+
+      //FileInputStream inputStream = new FileInputStream(zipFile.inputStream);
+      ZipInputStream zipInputStream = new ZipInputStream(zipFile2.inputStream);
+      ZipEntry zipEntry = null;
+
+      // Make the version directory in internal storage
+      //OpenForReadResult zipFile = resourceApi.openForRead(zipUri);
+
+      //ogMessage("UNZIP_DIR", versionDir.getAbsolutePath().toString());
+
+      // Figure out how many entries are in the zip so we can calculate extraction progress
+      ZipFile zipFile = new ZipFile(zipF);
+      float entries = new Float(zipFile.size());
+
+      logMessage("ENTRIES", "Total: " + (int) entries);
+
+      File outputDir = resourceApi.mapUriToFile(outputUri);
+      outputDirectory = outputDir.getAbsolutePath();
+      outputDirectory += outputDirectory.endsWith(File.separator) ? "" : File.separator;
+      if (outputDir == null || (!outputDir.exists() && !outputDir.mkdirs())){
+          String errorMessage = "Could not create output directory";
+          callbackContext.error(errorMessage);
+          //Log.e(LOG_TAG, errorMessage);
+          return;
+      }
+
+
+      float extracted = 0.0f;
+
+
+      while ((zipEntry = zipInputStream.getNextEntry()) != null) {
+        File newFile = new File(outputDirectory + "/" + zipEntry.getName());
+        if(zipEntry.isDirectory()){
+          newFile.mkdirs();
+        }
+        else {
+          if (newFile.canWrite()) {
+            if(newFile.exists())
+              newFile.delete();
+          } else {
+            logMessage("Not permission", outputDirectory + "/" + zipEntry.getName());
+          }
+          newFile.getParentFile().mkdirs();
+          byte[] buffer = new byte[2048];
+
+          FileOutputStream fileOutputStream = new FileOutputStream(newFile);
+          BufferedOutputStream outputBuffer = new BufferedOutputStream(fileOutputStream, buffer.length);
+          int bits;
+          while ((bits = zipInputStream.read(buffer, 0, buffer.length)) != -1) {
+            outputBuffer.write(buffer, 0, bits);
+          }
+          outputBuffer.flush();
+          outputBuffer.close();
+        }
+        zipInputStream.closeEntry();
+
+
+        extracted += 1;
+
+        float progress = (extracted / entries) * new Float("100.0f");
+        logMessage("EXTRACT", "Progress: " + (int) progress + "%");
+
+        PluginResult progressResult = new PluginResult(PluginResult.Status.OK, (int) progress);
+        progressResult.setKeepCallback(true);
+        callbackContext.sendPluginResult(progressResult);
+      }
+      zipInputStream.close();
+
+    } catch(Exception e) {
+      //TODO Handle problems..
+      logMessage("UNZIP_STEP", "Exception: " + e.getMessage());
+
+      // make sure to send an error
+      callbackContext.error(e.getMessage());
+      return;
+    }
 
     callbackContext.success("done");
   }
